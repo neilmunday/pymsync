@@ -221,7 +221,7 @@ if __name__ == "__main__":
 			if h + copies >= hostTotal:
 				# less hosts than we need to copy to on this iteration
 				break
-			if h <= processTotal:
+			if h < processTotal:
 				# create a new CommandProcess to handle the tasks
 				process = CommandProcess(tasks)
 				processes.append(process)
