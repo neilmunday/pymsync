@@ -219,16 +219,17 @@ if __name__ == "__main__":
 		logging.info("iteration %d, copies required: %d" % (i + 1, copies))
 		# create a new task queue
 		tasks = multiprocessing.JoinableQueue()
-		# create the CommandProcess objects to process the CommandTask objects
-		processes = [CommandProcess(tasks) for i in range(processTotal)]
-		# start the processes and which will wait for work to do
-		for p in processes:
-			p.start()
+		processes = []
 
 		for h in range(0, copies):
 			if h + copies >= hostTotal:
 				# less hosts than we need to copy to on this iteration
 				break
+			if copies <= processTotal:
+				# create a new CommandProcess to handle the tasks
+				process = CommandProcess(tasks)
+				processes.append(process)
+				process.start()
 			# work out the host we are going to copy to
 			hostToAdd = destinations[h + copies]
 			logging.debug("%s copies to %s" % (destinations[h], hostToAdd))
