@@ -146,10 +146,10 @@ class CommandProcess(multiprocessing.Process):
 			if self.__ok:
 				# only process the task if all is well
 				rtn = task.run()
-			if rtn != 0:
-				# something went wrong
-				logging.error("aborting tasks, failed to run: %s" % self.__command)
-				self.__ok = False
+				if rtn != 0:
+					# something went wrong
+					logging.error("aborting tasks, failed to run: %s" % self.__command)
+					self.__ok = False
 			self.__taskQueue.task_done()
 
 if __name__ == "__main__":
