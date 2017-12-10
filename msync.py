@@ -222,10 +222,7 @@ if __name__ == "__main__":
 		if copies > remaining:
 			copies = remaining
 
-		for h in range(0, remaining):
-			if h + copies >= hostTotal:
-				# less hosts than we need to copy to on this iteration
-				break
+		for h in range(0, copies):
 			if h < processTotal:
 				# create a new CommandProcess to handle the tasks
 				process = CommandProcess(tasks)
