@@ -40,7 +40,6 @@ import logging
 import multiprocessing
 import shlex
 import os
-import socket
 import subprocess
 import sys
 
@@ -170,17 +169,14 @@ if __name__ == "__main__":
 	checkExe(RSYNC_EXE)
 	checkExe(SSH_EXE)
 
-	destinations = [] # list of hosts that we have copied to
-	for d in args.destinations.split(","):
-		destinations.append(d.strip())
-
-	hostname = socket.gethostname()
+	hostname = os.uname()[1]
 	logging.debug("our hostname: %s" % hostname)
 
-	if hostname not in destinations:
-		# we must exist in the list of destinations
-		logging.info("adding %s to list of destinations" % hostname)
-		destinations[:0] = [hostname]
+	# List of hosts that we have copied to. We must exist in the list.
+	destinations = [hostname]
+	for d in args.destinations.split(","):
+		if d != hostname:
+			destinations.append(d.strip())
 
 	logging.debug("destinations: %s" % destinations)
 
