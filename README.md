@@ -3,6 +3,8 @@ pymsync
 
 Author: Neil Munday
 
+Contributors: David Murray (https://github.com/dajamu)
+
 Introduction
 ------------
 
