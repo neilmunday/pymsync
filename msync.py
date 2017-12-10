@@ -184,7 +184,7 @@ if __name__ == "__main__":
 	logging.info("using %d processes" % processTotal)
 
 	hostTotal = len(destinations)
-	hostsCopiedTo = [destinations[0]] # source has already been "copied" to the first host
+	hostsCopiedTo = 1 # source has already been "copied" to the first host
 
 	i = 0
 	copies = 1
@@ -210,14 +210,19 @@ if __name__ == "__main__":
 	logging.debug("destination path: %s" % destPath)
 
 	logging.info("syncing...")
-	while len(hostsCopiedTo) < hostTotal:
+
+	while hostsCopiedTo < hostTotal:
 		# loop until all hosts have been copied to
 		logging.info("iteration %d, copies required: %d" % (i + 1, copies))
 		# create a new task queue
 		tasks = multiprocessing.JoinableQueue()
 		processes = []
 
-		for h in range(0, copies):
+		remaining = hostTotal - hostsCopiedTo
+		if copies > remaining:
+			copies = remaining
+
+		for h in range(0, remaining):
 			if h + copies >= hostTotal:
 				# less hosts than we need to copy to on this iteration
 				break
@@ -229,7 +234,7 @@ if __name__ == "__main__":
 			# work out the host we are going to copy to
 			hostToAdd = destinations[h + copies]
 			logging.debug("%s copies to %s" % (destinations[h], hostToAdd))
-			hostsCopiedTo.append(hostToAdd)
+			hostsCopiedTo += 1
 			# create the CommandTask
 			tasks.put(CommandTask("%s %s %s -av %s %s:%s" % (SSH_EXE, destinations[h], RSYNC_EXE, sourcePath, hostToAdd, destPath)))
 		# add a "poison pill" to each process so they will exit when there is no more work to do
