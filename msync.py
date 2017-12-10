@@ -187,7 +187,7 @@ if __name__ == "__main__":
 	hostsCopiedTo = 1 # source has already been "copied" to the first host
 
 	i = 0
-	copies = 1
+	offset = 1
 
 	# work out the source and destination path strings to use with rsync
 	sourcePath = os.path.abspath(args.path.strip())
@@ -213,14 +213,16 @@ if __name__ == "__main__":
 
 	while hostsCopiedTo < hostTotal:
 		# loop until all hosts have been copied to
-		logging.info("iteration %d, copies required: %d" % (i + 1, copies))
 		# create a new task queue
 		tasks = multiprocessing.JoinableQueue()
 		processes = []
 
 		remaining = hostTotal - hostsCopiedTo
+		copies = offset
 		if copies > remaining:
 			copies = remaining
+
+		logging.info("iteration %d, copies required: %d" % (i + 1, copies))
 
 		for h in range(0, copies):
 			if h < processTotal:
@@ -229,7 +231,7 @@ if __name__ == "__main__":
 				processes.append(process)
 				process.start()
 			# work out the host we are going to copy to
-			hostToAdd = destinations[h + copies]
+			hostToAdd = destinations[h + offset]
 			logging.debug("%s copies to %s" % (destinations[h], hostToAdd))
 			hostsCopiedTo += 1
 			# create the CommandTask
@@ -242,6 +244,6 @@ if __name__ == "__main__":
 			p.join()
 
 		i += 1
-		copies = 2**i
+		offset = 2**i
 	# finished!
 	logging.info("done")
