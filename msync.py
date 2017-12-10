@@ -222,7 +222,7 @@ if __name__ == "__main__":
 		if copies > remaining:
 			copies = remaining
 
-		for h in range(0, remaining):
+		for h in range(0, copies):
 			if h + copies >= hostTotal:
 				# less hosts than we need to copy to on this iteration
 				break
