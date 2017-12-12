@@ -84,7 +84,7 @@ class CommandProcess(multiprocessing.Process):
 
 	def __init__(self, command):
 		"""
-		Creates a new CommandProcess object with the given task queue.
+		Creates a new CommandProcess object to run the given command.
 
 		:param command:	the command to run by this process
 		"""
@@ -94,7 +94,7 @@ class CommandProcess(multiprocessing.Process):
 
 	def run(self):
 		"""
-		Begin processing of the :class:`CommandTask` objects in the task queue.
+		Run the command assigned to this process.
 		"""
 		logging.debug("%s: running: %s" % (self.name, self.__command))
 		process = subprocess.Popen(shlex.split(self.__command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -161,8 +161,7 @@ if __name__ == "__main__":
 	while len(outList) > 0:
 		# loop until all hosts have been copied to
 		logging.info("hosts left to copy to: %d" % len(outList))
-		# create a new task queue
-		tasks = multiprocessing.JoinableQueue()
+		# list of CommandProcess objects
 		processes = []
 
 		# loop over each host in a copy inList,
