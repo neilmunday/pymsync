@@ -28,7 +28,7 @@
 
 	Usage:
 
-		msync.py -d host1,host2,host3... -p /path/to/sync
+		msync.py -d host1,host2,host3... -p /path/to/sync [ -v ] [ -c copiesPerHost ]
 
 		Notes:
 			- it is assumed that each host can SSH passwordless to all other hosts
@@ -114,7 +114,7 @@ if __name__ == "__main__":
 	parser.add_argument('-d', '--destinations', help="Comma separated list of destination hosts", required=True)
 	parser.add_argument('-p', '--path', help="Source path to copy via rsync", required=True)
 	parser.add_argument('-v', '--verbose', help="Turn on debug messages", action='store_true')
-	parser.add_argument('-c', '--copies-per-host', help="Number of copies to perform per host", dest="copiesPerHost", type=int, default=1)
+	parser.add_argument('-c', '--copies-per-host', help="Number of copies to perform per host (default = 1)", dest="copiesPerHost", type=int, default=1)
 	args = parser.parse_args()
 
 	logLevel = logging.INFO
