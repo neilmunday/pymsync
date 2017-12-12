@@ -91,7 +91,7 @@ class CommandProcess(multiprocessing.Process):
 		"""
 		super(CommandProcess, self).__init__()
 		# prevent stdout from being buffered
-		self.__command = "/usr/bin/stdbuf -o0 %s" % command
+		self.__command = "%s -o0 %s" % (STDBUF_EXE, command)
 
 	def run(self):
 		"""
