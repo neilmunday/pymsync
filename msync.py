@@ -75,46 +75,6 @@ def die(msg):
 	logging.error(msg)
 	sys.exit(1)
 
-def runCommand(cmd):
-	"""
- 	Execute the given command and return the result as a tuple.
-
-	:param	cmd:	the command to run
-	:returns:		a tuple of the form (return code, stdout, stderr)
-	"""
-	process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	stdout, stderr = process.communicate()
-	logging.debug("return code: %s" % process.returncode)
-	stdout = stdout.decode()
-	stderr = stderr.decode()
-	logging.debug("stdout:\n%s" % stdout)
-	logging.debug("stderr:\n%s" % stderr)
-	return (process.returncode, stdout, stderr)
-
-class CommandTask(object):
-	"""
-	A CommandTask object is used by CommandProcess objects
-	to execute commands.
-	"""
-
-	def __init__(self, command):
-		"""
-		Create the CommandTask object with the given command.
-
-		:param command:		the command to execute
-		"""
-		self.__command = command
-		logging.debug("CommandTask: %s" % self.__command)
-
-	def run(self):
-		"""
-		Executes the given command - should be invoked by a CommandProcess object.
-
-		:returns:	the return code from executing the command
-		"""
-		rtn, stdout, stderr = runCommand(self.__command)
-		return rtn
-
 class CommandProcess(multiprocessing.Process):
 	"""
 	The CommandProcess class subclasses the multiprocessing.Process class to implement
@@ -122,45 +82,39 @@ class CommandProcess(multiprocessing.Process):
 	in parallel.
 	"""
 
-	def __init__(self, taskQueue):
+	def __init__(self, command):
 		"""
 		Creates a new CommandProcess object with the given task queue.
 
-		:param taskQueue:	the task queue to get :class:`CommandTask` objects from
+		:param command:	the command to run by this process
 		"""
 		super(CommandProcess, self).__init__()
-		self.__taskQueue = taskQueue
-		self.__ok = True # set to False later if we need to abort cleanly
+		# prevent stdout from being buffered
+		self.__command = "/usr/bin/stdbuf -o0 %s" % command
 
 	def run(self):
 		"""
 		Begin processing of the :class:`CommandTask` objects in the task queue.
 		"""
-		while True:
-			task = self.__taskQueue.get()
-			if task is None:
-				# poison pill, time to exit
-				logging.debug("%s: exiting..." % self.name)
-				self.__taskQueue.task_done()
-				break
-			if self.__ok:
-				# only process the task if all is well
-				rtn = task.run()
-				if rtn != 0:
-					# something went wrong
-					logging.error("aborting tasks, failed to run: %s" % self.__command)
-					self.__ok = False
-			self.__taskQueue.task_done()
-		if not self.__ok:
-			return 1
-		return 0
+		logging.debug("%s: running: %s" % (self.name, self.__command))
+		process = subprocess.Popen(shlex.split(self.__command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		stdout, stderr = process.communicate()
+		logging.debug("return code: %s" % process.returncode)
+		if process.returncode != 0 or logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+			stdout = stdout.decode()
+			stderr = stderr.decode()
+			if process.returncode != 0:
+				die("%s: failed to run: %s\nstdout:\n%s\nstderr:\n%s\n" % (self.name, self.__command, stdout, stderr))
+			logging.debug("%s: stdout:\n%s" % (self.name, stdout))
+			logging.debug("%s: complete" % self.name)
 
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(description='Uses divide and conqueor method to run rsync to N servers', add_help=True)
 	parser.add_argument('-d', '--destinations', help="Comma separated list of destination hosts", required=True)
 	parser.add_argument('-p', '--path', help="Source path to copy via rsync", required=True)
-	parser.add_argument('-v', '--verbose', help='Turn on debug messages', dest='verbose', action='store_true')
+	parser.add_argument('-v', '--verbose', help="Turn on debug messages", action='store_true')
+	parser.add_argument('-c', '--copies-per-host', help="Number of copies to perform per host", dest="copiesPerHost", type=int, default=1)
 	args = parser.parse_args()
 
 	logLevel = logging.INFO
@@ -175,22 +129,14 @@ if __name__ == "__main__":
 	hostname = os.uname()[1]
 	logging.debug("our hostname: %s" % hostname)
 
-	# List of hosts that we have copied to. We must exist in the list.
-	destinations = [hostname]
+	inList = [hostname]
+	outList = []
 	for d in args.destinations.split(","):
-		if d != hostname:
-			destinations.append(d.strip())
+		if d != hostname and d not in inList:
+			outList.append(d)
 
-	logging.debug("destinations: %s" % destinations)
-
-	processTotal = multiprocessing.cpu_count() * 2 # number of CommandProcess objects to create
-	logging.info("using %d processes" % processTotal)
-
-	hostTotal = len(destinations)
-	hostsCopiedTo = 1 # source has already been "copied" to the first host
-
-	i = 0
-	offset = 1
+	logging.debug("hosts to copy to: %s" % ",".join(outList))
+	logging.debug("copies per host: %s" % args.copiesPerHost)
 
 	# work out the source and destination path strings to use with rsync
 	sourcePath = os.path.abspath(args.path.strip())
@@ -212,45 +158,36 @@ if __name__ == "__main__":
 	logging.info("syncing...")
 	exitOk = True
 
-	while hostsCopiedTo < hostTotal:
+	while len(outList) > 0:
 		# loop until all hosts have been copied to
+		logging.info("hosts left to copy to: %d" % len(outList))
 		# create a new task queue
 		tasks = multiprocessing.JoinableQueue()
 		processes = []
 
-		remaining = hostTotal - hostsCopiedTo
-		copies = offset
-		if copies > remaining:
-			copies = remaining
-
-		logging.info("iteration %d, copies required: %d" % (i + 1, copies))
-
-		for h in range(0, copies):
-			if h < processTotal:
-				# create a new CommandProcess to handle the tasks
-				process = CommandProcess(tasks)
+		# loop over each host in a copy inList,
+		# and start N copies to hosts in outList
+		for sourceHost in list(inList):
+			for i in range(args.copiesPerHost):
+				if len(outList) == 0:
+					break
+				destHost = outList.pop()
+				inList.append(destHost)
+				logging.info("%s copying to %s" % (sourceHost, destHost))
+				if sourceHost == hostname:
+					process = CommandProcess("%s -av %s %s:%s" % (RSYNC_EXE, sourcePath, destHost, destPath))
+				else:
+					process = CommandProcess("%s %s %s -av %s %s:%s" % (SSH_EXE, sourceHost, RSYNC_EXE, sourcePath, destHost, destPath))
 				processes.append(process)
 				process.start()
-			# work out the host we are going to copy to
-			hostToAdd = destinations[h + offset]
-			logging.debug("%s copies to %s" % (destinations[h], hostToAdd))
-			hostsCopiedTo += 1
-			# create the CommandTask
-			tasks.put(CommandTask("%s %s %s -av %s %s:%s" % (SSH_EXE, destinations[h], RSYNC_EXE, sourcePath, hostToAdd, destPath)))
-		# add a "poison pill" to each process so they will exit when there is no more work to do
-		for p in processes:
-			tasks.put(None)
-		# wait for all processes to finish before proceeding to the next iteration
+
 		for p in processes:
 			p.join()
 			if exitOk and p.exitcode != 0:
 				exitOk = False
-
+		logging.debug("all processes joined main thread")
 		if not exitOk:
 			break
-
-		i += 1
-		offset = 2**i
 
 	if not exitOk:
 		die("one or more hosts failed to copy %s" % sourcePath)
