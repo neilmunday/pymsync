@@ -151,6 +151,9 @@ class CommandProcess(multiprocessing.Process):
 					logging.error("aborting tasks, failed to run: %s" % self.__command)
 					self.__ok = False
 			self.__taskQueue.task_done()
+		if not self.__ok:
+			return 1
+		return 0
 
 if __name__ == "__main__":
 
@@ -191,10 +194,7 @@ if __name__ == "__main__":
 
 	# work out the source and destination path strings to use with rsync
 	sourcePath = os.path.abspath(args.path.strip())
-	if sourcePath.endswith("/*"):
-		destPath = sourcePath[:-1]
-		checkDir(destPath)
-	elif sourcePath.endswith("/"):
+	if sourcePath.endswith("/"):
 		destPath = sourcePath
 		sourcePath = sourcePath[:-1]
 		checkDir(sourcePath)
@@ -210,6 +210,7 @@ if __name__ == "__main__":
 	logging.debug("destination path: %s" % destPath)
 
 	logging.info("syncing...")
+	exitOk = True
 
 	while hostsCopiedTo < hostTotal:
 		# loop until all hosts have been copied to
@@ -242,8 +243,17 @@ if __name__ == "__main__":
 		# wait for all processes to finish before proceeding to the next iteration
 		for p in processes:
 			p.join()
+			if exitOk and p.exitcode != 0:
+				exitOk = False
+
+		if not exitOk:
+			break
 
 		i += 1
 		offset = 2**i
+
+	if not exitOk:
+		die("one or more hosts failed to copy %s" % sourcePath)
 	# finished!
 	logging.info("done")
+	sys.exit(0)
