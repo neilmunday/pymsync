@@ -187,10 +187,8 @@ if __name__ == "__main__":
 				exitOk = False
 		logging.debug("all processes joined main thread")
 		if not exitOk:
-			break
+			die("one or more hosts failed to copy %s" % sourcePath)
 
-	if not exitOk:
-		die("one or more hosts failed to copy %s" % sourcePath)
 	# finished!
 	logging.info("done")
 	sys.exit(0)
