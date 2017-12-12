@@ -45,6 +45,7 @@ import sys
 
 RSYNC_EXE = "/usr/bin/rsync"
 SSH_EXE = "/usr/bin/ssh"
+STDBUF_EXE = "/usr/bin/stdbuf"
 
 def checkDir(d):
 	"""
@@ -125,6 +126,7 @@ if __name__ == "__main__":
 
 	checkExe(RSYNC_EXE)
 	checkExe(SSH_EXE)
+	checkExe(STDBUF_EXE)
 
 	hostname = os.uname()[1]
 	logging.debug("our hostname: %s" % hostname)
