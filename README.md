@@ -10,7 +10,7 @@ Repository: https://github.com/neilmunday/pymsync
 Introduction
 ------------
 
-pymsync provides the `msync` utility which allows the user to synchronise a file path via `rsync` across multiple hosts. Rather than all destination hosts copying from the source host, `msync` uses an efficent algorithm that makes use of the destination hosts to copy to other hosts. This therefore dramatically decreases the time required to synchronise the files.
+pymsync provides the `msync` utility which allows the user to synchronise a file path via `rsync` across multiple hosts. Rather than all destination hosts copying from the source host, `msync` uses an efficient algorithm that makes use of the destination hosts to copy to other hosts. This therefore dramatically decreases the time required to synchronise the files.
 
 It is assumed that the host that `msync` is running on contains the directory/files to be synchronised.
 
