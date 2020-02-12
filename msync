@@ -28,7 +28,7 @@
 
 	Usage:
 
-		msync.py -d host1,host2,host3... -p /path/to/sync [ -v ] [ -c copiesPerHost ]
+		msync -d host1,host2,host3... -p /path/to/sync [ -v ] [ -c copiesPerHost ]
 
 		Notes:
 			- it is assumed that each host can SSH passwordless to all other hosts
@@ -83,7 +83,7 @@ class CommandProcess(multiprocessing.Process):
 	in parallel.
 	"""
 
-	def __init__(self, command):
+	def __init__(self, command, dryRun):
 		"""
 		Creates a new CommandProcess object to run the given command.
 
@@ -92,6 +92,7 @@ class CommandProcess(multiprocessing.Process):
 		super(CommandProcess, self).__init__()
 		# prevent stdout from being buffered
 		self.__command = "%s -o0 %s" % (STDBUF_EXE, command)
+		self.__dryrun = dryRun
 
 	def run(self):
 		"""
@@ -101,13 +102,16 @@ class CommandProcess(multiprocessing.Process):
 		process = subprocess.Popen(shlex.split(self.__command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		stdout, stderr = process.communicate()
 		logging.debug("return code: %s" % process.returncode)
-		if process.returncode != 0 or logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+		if process.returncode != 0 or logging.getLogger().getEffectiveLevel() == logging.DEBUG or self.__dryrun:
 			stdout = stdout.decode()
 			stderr = stderr.decode()
 			if process.returncode != 0:
 				die("%s: failed to run: %s\nstdout:\n%s\nstderr:\n%s\n" % (self.name, self.__command, stdout, stderr))
-			logging.debug("%s: stdout:\n%s" % (self.name, stdout))
-			logging.debug("%s: complete" % self.name)
+			if self.__dryrun:
+				logging.info("%s:\n%s" % (self.name, stdout))
+			else:
+				logging.debug("%s: stdout:\n%s" % (self.name, stdout))
+				logging.debug("%s: complete" % self.name)
 
 if __name__ == "__main__":
 
@@ -115,6 +119,7 @@ if __name__ == "__main__":
 	parser.add_argument('-d', '--destinations', help="Comma separated list of destination hosts", required=True)
 	parser.add_argument('-p', '--path', help="Source path to copy via rsync", required=True)
 	parser.add_argument('-v', '--verbose', help="Turn on debug messages", action='store_true')
+	parser.add_argument('-n', '--dry-run', help="Perform a dry-run - do not copy anything", action='store_true', dest='dryrun')
 	parser.add_argument('-c', '--copies-per-host', help="Number of copies to perform per host (default = 1)", dest="copiesPerHost", type=int, default=1)
 	args = parser.parse_args()
 
@@ -136,6 +141,11 @@ if __name__ == "__main__":
 	for d in args.destinations.split(","):
 		if d != hostname and d not in inList:
 			outList.append(d)
+
+	dryrunArg = ''
+	if args.dryrun:
+		logging.info("performing dry-run")
+		dryrunArg = 'n'
 
 	logging.debug("hosts to copy to: %s" % ",".join(outList))
 	logging.debug("copies per host: %s" % args.copiesPerHost)
@@ -176,9 +186,9 @@ if __name__ == "__main__":
 				inList.append(destHost)
 				logging.info("%s copying to %s" % (sourceHost, destHost))
 				if sourceHost == hostname:
-					process = CommandProcess("%s -av %s %s:%s" % (RSYNC_EXE, sourcePath, destHost, destPath))
+					process = CommandProcess("%s -av%s %s %s:%s" % (RSYNC_EXE, dryrunArg, sourcePath, destHost, destPath), args.dryrun)
 				else:
-					process = CommandProcess("%s %s %s -av %s %s:%s" % (SSH_EXE, sourceHost, RSYNC_EXE, sourcePath, destHost, destPath))
+					process = CommandProcess("%s %s %s -av%s %s %s:%s" % (SSH_EXE, sourceHost, RSYNC_EXE, dryrunArg, sourcePath, destHost, destPath), args.dryrun)
 				processes.append(process)
 				process.start()
 
