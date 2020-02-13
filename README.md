@@ -27,6 +27,8 @@ optional arguments:
   -p PATH, --path PATH  Source path to copy via rsync
   -v, --verbose         Turn on debug messages
   -n, --dry-run         Perform a dry-run - do not copy anything
+  -e, --erase           Delete files not present on destination hosts - sets
+                        --delete on rsync commands
   -c COPIESPERHOST, --copies-per-host COPIESPERHOST
                         Number of copies to perform per host (default = 1)
 ```
