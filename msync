@@ -28,7 +28,7 @@
 
 	Usage:
 
-		msync -d host1,host2,host3... -p /path/to/sync [ -v ] [ -c copiesPerHost ]
+		msync -d host1,host2,host3... -p /path/to/sync [ -v ] [ -c copiesPerHost ] [ -e ] [ -n ]
 
 		Notes:
 			- it is assumed that each host can SSH passwordless to all other hosts
@@ -120,6 +120,7 @@ if __name__ == "__main__":
 	parser.add_argument('-p', '--path', help="Source path to copy via rsync", required=True)
 	parser.add_argument('-v', '--verbose', help="Turn on debug messages", action='store_true')
 	parser.add_argument('-n', '--dry-run', help="Perform a dry-run - do not copy anything", action='store_true', dest='dryrun')
+	parser.add_argument('-e', '--erase', help="Delete files not present on destination hosts - sets --delete on rsync commands", action='store_true', dest='erase')
 	parser.add_argument('-c', '--copies-per-host', help="Number of copies to perform per host (default = 1)", dest="copiesPerHost", type=int, default=1)
 	args = parser.parse_args()
 
@@ -146,6 +147,11 @@ if __name__ == "__main__":
 	if args.dryrun:
 		logging.info("performing dry-run")
 		dryrunArg = 'n'
+
+	deleteArg = ''
+	if args.erase:
+		logging.info("files will be deleted that are not present on destination hosts")
+		deleteArg = '--delete'
 
 	logging.debug("hosts to copy to: %s" % ",".join(outList))
 	logging.debug("copies per host: %s" % args.copiesPerHost)
@@ -186,9 +192,9 @@ if __name__ == "__main__":
 				inList.append(destHost)
 				logging.info("%s copying to %s" % (sourceHost, destHost))
 				if sourceHost == hostname:
-					process = CommandProcess("%s -av%s %s %s:%s" % (RSYNC_EXE, dryrunArg, sourcePath, destHost, destPath), args.dryrun)
+					process = CommandProcess("%s -av%s %s %s %s:%s" % (RSYNC_EXE, dryrunArg, deleteArg, sourcePath, destHost, destPath), args.dryrun)
 				else:
-					process = CommandProcess("%s %s %s -av%s %s %s:%s" % (SSH_EXE, sourceHost, RSYNC_EXE, dryrunArg, sourcePath, destHost, destPath), args.dryrun)
+					process = CommandProcess("%s %s %s -av%s %s %s %s:%s" % (SSH_EXE, sourceHost, RSYNC_EXE, dryrunArg, deleteArg, sourcePath, destHost, destPath), args.dryrun)
 				processes.append(process)
 				process.start()
 
